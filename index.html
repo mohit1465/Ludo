@@ -707,38 +707,54 @@
                 function movePawn(pawn, newPosition) {
                     const oldCell = pawn.parentElement;
                     const newCell = document.querySelector(`.grid-item[data-cell-number="${newPosition}"]`);
+                    const pawnColor = pawn.classList[1].split('-')[0]; // Store original color
                     
                     if (newCell) {
                         const existingPawns = newCell.querySelectorAll('.pawn');
-                        const pawnColor = pawn.classList[1].replace('-pawn', '');
                         const isSafePosition = safePositions.includes(newPosition);
                         
                         if (existingPawns.length > 0) {
-                            const firstPawnColor = existingPawns[0].classList[1].replace('-pawn', '');
+                            const firstPawnColor = existingPawns[0].classList[1].split('-')[0];
                             
                             if (firstPawnColor !== pawnColor) {
                                 if (isSafePosition) {
-                                    // On safe position, stack pawns of different colors with proper z-index
+                                    // Safe position stacking
                                     oldCell.removeChild(pawn);
                                     newCell.appendChild(pawn);
+                                    // Ensure pawn maintains its original color
+                                    pawn.className = `pawn ${pawnColor}-pawn`;
+                                    
+                                    // Update z-index for stacking
                                     const allPawnsInCell = newCell.querySelectorAll('.pawn');
                                     allPawnsInCell.forEach((p, index) => {
+                                        const color = p.classList[1].split('-')[0];
+                                        p.className = `pawn ${color}-pawn`; // Maintain original colors
                                         p.style.zIndex = (index + 2).toString();
+                                        // Add stacking positions
+                                        if (index === 0) p.style.transform = 'translate(-8px, -8px)';
+                                        if (index === 1) p.style.transform = 'translate(8px, -8px)';
+                                        if (index === 2) p.style.transform = 'translate(-8px, 8px)';
+                                        if (index === 3) p.style.transform = 'translate(8px, 8px)';
                                     });
-                                    pawn.style.zIndex = (allPawnsInCell.length + 2).toString();
                                 } else {
-                                    // Capture logic remains the same
+                                    // Capture logic
                                     existingPawns.forEach(existingPawn => {
-                                        const existingPawnColor = existingPawn.classList[1].replace('-pawn', '');
+                                        const existingPawnColor = existingPawn.classList[1].split('-')[0];
                                         const homePosition = findAvailableHomePosition(existingPawnColor);
                                         const homeCell = document.querySelector(`.grid-item[data-cell-number="${homePosition}"]`);
                                         newCell.removeChild(existingPawn);
                                         homeCell.appendChild(existingPawn);
+                                        // Ensure captured pawn maintains its original color
                                         existingPawn.className = `pawn ${existingPawnColor}-pawn`;
+                                        existingPawn.style.transform = '';
                                         existingPawn.style.zIndex = '2';
                                     });
                                     oldCell.removeChild(pawn);
                                     newCell.appendChild(pawn);
+                                    // Ensure moving pawn maintains its color
+                                    pawn.className = `pawn ${pawnColor}-pawn`;
+                                    pawn.style.transform = '';
+                                    pawn.style.zIndex = '2';
                                 }
                             } else {
                                 // Stack same color pawns
@@ -750,10 +766,11 @@
                                 });
                             }
                         } else {
-                            // No existing pawns, just move
+                            // No existing pawns
                             oldCell.removeChild(pawn);
                             newCell.appendChild(pawn);
                             pawn.className = `pawn ${pawnColor}-pawn`;
+                            pawn.style.transform = '';
                             pawn.style.zIndex = '2';
                         }
                     }
@@ -1001,9 +1018,9 @@
                     });
                 }
 
-                // Update the existing updateDiceVisibility function
+                // Update the updateDiceVisibility function
                 function updateDiceVisibility() {
-                    // Existing dice visibility code
+                    // Update dice visibility
                     document.querySelectorAll('.dice-container').forEach(dice => {
                         if (dice.id === `${gameState.currentPlayer}-dice`) {
                             dice.style.opacity = '1';
@@ -1014,12 +1031,20 @@
                         }
                     });
                     
-                    // Add pawn highlight update
+                    // Update pawn highlights
                     updatePawnHighlights();
 
-                    // Check for computer turn after updating dice visibility
-                    if (gameConfig.players[gameState.currentPlayer]?.type === 'computer' && gameState.canRoll) {
-                        setTimeout(computerPlay, 1500);
+                    // Check for computer turn ONLY if current player is a computer
+                    const currentPlayerType = gameConfig.players[gameState.currentPlayer]?.type;
+                    console.log('Current player:', gameState.currentPlayer, 'Type:', currentPlayerType);
+                    
+                    if (currentPlayerType === 'computer' && gameState.canRoll) {
+                        setTimeout(async () => {
+                            console.log('Triggering computer turn for', gameState.currentPlayer);
+                            await checkComputerTurn();
+                        }, 1500);
+                    } else {
+                        console.log('Human player turn or cannot roll');
                     }
                 }
 
@@ -1120,84 +1145,82 @@
                 });
 
                 // Add this after the initializeAI declaration
-                function initializeAI() {
-                    checkComputerTurn();
+                async function initializeAI() {
+                    await checkComputerTurn();
                 }
 
-                function checkComputerTurn() {
-                    // Check if it's a computer player's turn
+                async function checkComputerTurn() {
                     if (gameState.currentPlayer && 
                         gameConfig.players[gameState.currentPlayer]?.type === 'computer' && 
                         gameState.canRoll) {
-                        setTimeout(computerPlay, 1000);
+                        await sleep(500); // Wait before starting computer turn
+                        await computerPlay();
                     }
                 }
 
-                function computerPlay() {
+                // Add sleep helper function
+                function sleep(ms) {
+                    return new Promise(resolve => setTimeout(resolve, ms));
+                }
+
+                // Update computerPlay to be async
+                async function computerPlay() {
                     console.log('computerPlay started for', gameState.currentPlayer);
                     const diceId = `${gameState.currentPlayer}-dice`;
+                    
+                    // Roll dice and wait for animation
                     console.log('Rolling dice:', diceId);
                     rollDice(diceId);
-                
-                    // Increase the wait time to ensure the dice roll animation and state updates are complete
-                    setTimeout(() => {
-                        console.log('Checking game state after roll:', {
-                            currentPlayer: gameState.currentPlayer,
-                            canRoll: gameState.canRoll,
-                            canSelectPawn: gameState.canSelectPawn,
-                            lastRoll: gameState.lastRoll
-                        });
-                
-                        if (gameState.canSelectPawn) {
-                            console.log('Finding best move...');
-                            const bestMove = findBestMove();
-                            console.log('Best move found:', bestMove);
+                    await sleep(1500); // Wait for dice roll animation
+                    
+                    console.log('Dice roll complete:', {
+                        currentPlayer: gameState.currentPlayer,
+                        canRoll: gameState.canRoll,
+                        canSelectPawn: gameState.canSelectPawn,
+                        lastRoll: gameState.lastRoll
+                    });
+                    
+                    // Wait until pawn selection is possible
+                    let attempts = 0;
+                    while (!gameState.canSelectPawn && attempts < 5) {
+                        await sleep(300);
+                        attempts++;
+                    }
+                    
+                    if (gameState.canSelectPawn) {
+                        console.log('Finding best move...');
+                        const bestMove = findBestMove();
+                        console.log('Best move found:', bestMove);
+                        
+                        if (bestMove) {
+                            console.log('Executing move:', bestMove);
+                            const event = new MouseEvent('click', {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window
+                            });
+                            bestMove.pawn.dispatchEvent(event);
                             
-                            if (bestMove) {
-                                console.log('Moving pawn:', bestMove);
-                                const event = new MouseEvent('click', {
-                                    bubbles: true,
-                                    cancelable: true,
-                                    view: window
-                                });
-                                bestMove.pawn.dispatchEvent(event);
-                                
-                                // Wait for move to complete before checking for additional moves
-                                setTimeout(() => {
-                                    if (gameState.lastRoll === 6 && gameState.canRoll) {
-                                        console.log('Got a 6, playing again');
-                                        computerPlay();
-                                    } else {
-                                        console.log('Turn complete');
-                                        updateDiceVisibility();
-                                    }
-                                }, 500);
+                            // Wait for move animation
+                            await sleep(500);
+                            
+                            // Check if we got a 6 and can roll again
+                            if (gameState.lastRoll === 6 && gameState.canRoll) {
+                                console.log('Got a 6, playing another turn');
+                                await computerPlay();
                             } else {
-                                console.log('No valid moves available');
-                                gameState.currentPlayer = getNextPlayer();
-                                gameState.canRoll = true;
+                                console.log('Turn complete');
                                 updateDiceVisibility();
                             }
                         } else {
-                            console.log('Cannot select pawn, waiting...');
-                            // Add another check after a short delay
-                            setTimeout(() => {
-                                if (gameState.canSelectPawn) {
-                                    console.log('Pawn selection now possible, retrying...');
-                                    computerPlay();
-                                } else {
-                                    console.log('Still cannot select pawn, ending turn');
-                                    if (gameState.lastRoll !== 6) {
-                                        gameState.currentPlayer = getNextPlayer();
-                                    }
-                                    gameState.canRoll = true;
-                                    updateDiceVisibility();
-                                }
-                            }, 500);
+                            console.log('No valid moves available');
+                            gameState.currentPlayer = getNextPlayer();
+                            gameState.canRoll = true;
+                            updateDiceVisibility();
                         }
-                    }, 1500); // Increased delay to ensure dice roll completes
+                    }
                 }
-                
+
                 function findBestMove() {
                     console.log('Starting findBestMove for player:', gameState.currentPlayer);
                     const playerPawns = document.querySelectorAll(`.${gameState.currentPlayer}-pawn`);
